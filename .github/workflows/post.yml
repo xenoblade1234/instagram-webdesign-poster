@@ -2,7 +2,7 @@ name: Instagram Webdesign Auto-Poster
 
 on:
   schedule:
-    - cron: "54 9 * * *"
+    - cron: "17 */3 * * *"
   workflow_dispatch: {}
 
 jobs:
