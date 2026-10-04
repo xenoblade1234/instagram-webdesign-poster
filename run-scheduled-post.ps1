@@ -308,7 +308,51 @@ Anforderungen:
 
 
     # ============================================================
-    # 6. ERGEBNIS
+    # 6. AUF FACEBOOK-SEITE POSTEN
+    # ============================================================
+    # Laeuft auch, wenn Instagram scheitert. Ein Facebook-Fehler bricht den Run nicht ab,
+    # laesst ihn am Ende aber rot werden, damit er in GitHub Actions auffaellt.
+
+    $facebookPostId = $null
+    $facebookFailed = $false
+
+    if ([string]::IsNullOrEmpty($env:FB_PAGE_ID) -or [string]::IsNullOrEmpty($env:FB_PAGE_TOKEN)) {
+        Write-Host ""
+        Write-Host "6. Facebook uebersprungen (FB_PAGE_ID / FB_PAGE_TOKEN nicht gesetzt)."
+    }
+    else {
+        Write-Host ""
+        Write-Host "6. Poste auf Facebook-Seite..."
+        Write-Host ""
+
+        try {
+            $facebookBody = @{
+                url          = $mediaUrl
+                caption      = $caption
+                access_token = $env:FB_PAGE_TOKEN
+            }
+
+            # /photos veroeffentlicht direkt, kein Container-Schritt wie bei Instagram
+            $facebookResponse = Invoke-RestMethod `
+                -Uri "https://graph.facebook.com/v23.0/$($env:FB_PAGE_ID)/photos" `
+                -Method POST `
+                -Body $facebookBody
+
+            $facebookPostId = $facebookResponse.post_id
+            Write-Host "Facebook-Post erstellt: $facebookPostId"
+        }
+        catch {
+            $facebookFailed = $true
+            Write-Host "Facebook-Post fehlgeschlagen: $($_.Exception.Message)"
+            if ($_.ErrorDetails.Message) {
+                Write-Host $_.ErrorDetails.Message
+            }
+        }
+    }
+
+
+    # ============================================================
+    # 7. ERGEBNIS
     # ============================================================
 
     if ($null -eq $published) {
@@ -327,9 +371,14 @@ Anforderungen:
         Write-Host "ERFOLGREICH VEROEFFENTLICHT"
         Write-Host "==============================================="
         Write-Host "Instagram Media ID: $($published.id)"
+        Write-Host "Facebook Post ID: $facebookPostId"
         Write-Host "Bildthema: $thema"
         Write-Host "Cloudinary URL: $mediaUrl"
         Write-Host "Gesamtdauer: $($duration.Minutes) Minuten und $($duration.Seconds) Sekunden"
+
+        if ($facebookFailed) {
+            exit 1
+        }
     }
 
 }
