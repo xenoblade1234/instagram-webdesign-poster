@@ -18,6 +18,15 @@ try {
 
     $openAiKey = $env:OPENAI_API_KEY
 
+    # Facebook-Einstellungen, gespiegelt aus dem Artifact "Facebook & Instagram Uploader".
+    # Seite und Token kommen aus den Secrets FB_PAGE_ID / FB_PAGE_TOKEN.
+    $facebookEnabled = $true
+    $facebookCaptionMode = "same"     # same = Instagram-Caption unveraendert, custom = Regeln unten
+    $facebookHashtags = "limit"       # keep | limit | none
+    $facebookHashtagMax = 3
+    $facebookLink = ""
+    $facebookFooter = ""
+
     foreach ($name in @(
         "INSTAGRAM_USER_ID", "INSTAGRAM_TOKEN",
         "CLOUDINARY_CLOUD_NAME", "CLOUDINARY_API_KEY", "CLOUDINARY_API_SECRET",
@@ -316,7 +325,11 @@ Anforderungen:
     $facebookPostId = $null
     $facebookFailed = $false
 
-    if ([string]::IsNullOrEmpty($env:FB_PAGE_ID) -or [string]::IsNullOrEmpty($env:FB_PAGE_TOKEN)) {
+    if (-not $facebookEnabled) {
+        Write-Host ""
+        Write-Host "6. Facebook ist im Uploader ausgeschaltet."
+    }
+    elseif ([string]::IsNullOrEmpty($env:FB_PAGE_ID) -or [string]::IsNullOrEmpty($env:FB_PAGE_TOKEN)) {
         Write-Host ""
         Write-Host "6. Facebook uebersprungen (FB_PAGE_ID / FB_PAGE_TOKEN nicht gesetzt)."
     }
@@ -325,10 +338,23 @@ Anforderungen:
         Write-Host "6. Poste auf Facebook-Seite..."
         Write-Host ""
 
+        $facebookCaption = $caption
+        if ($facebookCaptionMode -eq "custom") {
+            $tags = @([regex]::Matches($caption, '#[\p{L}\p{N}_]+') | ForEach-Object { $_.Value })
+            $text = ([regex]::Replace($caption, '#[\p{L}\p{N}_]+', '')).Trim()
+            if ($facebookHashtags -eq "none") { $tags = @() }
+            elseif ($facebookHashtags -eq "limit") { $tags = @($tags | Select-Object -First $facebookHashtagMax) }
+
+            $facebookCaption = $text
+            if ($facebookFooter.Trim()) { $facebookCaption += "`n`n" + $facebookFooter.Trim() }
+            if ($facebookLink.Trim()) { $facebookCaption += "`n" + $facebookLink.Trim() }
+            if ($tags.Count -gt 0) { $facebookCaption += "`n`n" + ($tags -join " ") }
+        }
+
         try {
             $facebookBody = @{
                 url          = $mediaUrl
-                caption      = $caption
+                caption      = $facebookCaption
                 access_token = $env:FB_PAGE_TOKEN
             }
 
